@@ -10,8 +10,6 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -25,7 +23,7 @@ class MainActivity : AppCompatActivity() {
     private val updateTimeRunnable = object : Runnable {
         override fun run() {
             updateLastUpdatedTime()
-            handler.postDelayed(this, 30000) // Repeat every 30 seconds
+            handler.postDelayed(this, 30000) // повторять каждые 30 секунд
         }
     }
 
@@ -39,6 +37,21 @@ class MainActivity : AppCompatActivity() {
 
         handler.postDelayed(updateTimeRunnable, 30000)
 
+        // Проверяем, есть ли сохранённое состояние
+        savedInstanceState?.let {
+            val lastUpdatedTime = it.getString("lastUpdatedTime")
+            lastUpdatedTextView.text = "Last updated: $lastUpdatedTime"
+        }
+
+        loadData()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("lastUpdatedTime", lastUpdatedTextView.text.toString())
+    }
+
+    private fun loadData() {
         val retrofit = Retrofit.Builder()
             .baseUrl("https://www.cbr-xml-daily.ru/")
             .addConverterFactory(GsonConverterFactory.create())
@@ -46,7 +59,7 @@ class MainActivity : AppCompatActivity() {
 
         val apiService = retrofit.create(ApiService::class.java)
 
-        progressBar.visibility = ProgressBar.VISIBLE // progress bar
+        progressBar.visibility = ProgressBar.VISIBLE // показать бар
 
         GlobalScope.launch(Dispatchers.IO) {
             try {
@@ -61,25 +74,13 @@ class MainActivity : AppCompatActivity() {
                     GlobalScope.launch(Dispatchers.Main) {
                         lastUpdatedTextView.text = "Last updated: $lastUpdated"
                         currencyListTextView.text = currencies
-                        progressBar.visibility = ProgressBar.GONE // Hide bar on successful response
+                        progressBar.visibility = ProgressBar.GONE
                     }
                 } else {
                     GlobalScope.launch(Dispatchers.Main) {
                         currencyListTextView.text = "Failed to fetch data"
-                        progressBar.visibility = ProgressBar.GONE // Hide bar on failed response
+                        progressBar.visibility = ProgressBar.GONE
                     }
-                }
-            } catch (e: SocketTimeoutException) {
-                e.printStackTrace()
-                GlobalScope.launch(Dispatchers.Main) {
-                    currencyListTextView.text = "Timeout occurred: ${e.message}"
-                    progressBar.visibility = ProgressBar.GONE // Hide bar on error
-                }
-            } catch (e: UnknownHostException) {
-                e.printStackTrace()
-                GlobalScope.launch(Dispatchers.Main) {
-                    currencyListTextView.text = "Host not found: ${e.message}"
-                    progressBar.visibility = ProgressBar.GONE
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
